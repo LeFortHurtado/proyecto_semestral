@@ -18,4 +18,26 @@ class LoginViewModel (
     }
     /// Hasta aqui
 
+    fun onPasswordChange(value: String){
+        uiState=uiState.copy(password = value, error=null)
+    }
+
+    fun submit(onSuccess:(String)  -> Unit) {
+
+        uiState=uiState.copy(isLoading = true, error=null)
+
+        val ok =repo.login(uiState.username.trim(), uiState.password)
+
+        uiState=uiState.copy(isLoading = false)
+
+        if (ok) onSuccess(uiState.username.trim())
+        else uiState=uiState.copy(error="Credenciales Invalidas")
+
+    }   //fin unit
+
+
+
+
+
+
 }// fin viewmodel

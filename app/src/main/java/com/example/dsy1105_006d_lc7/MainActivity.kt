@@ -11,40 +11,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import com.example.dsy1105_006d_lc7.navigation.AppNav
 import com.example.dsy1105_006d_lc7.ui.login.HomeScreen
 import com.example.dsy1105_006d_lc7.ui.theme.DSY1105006DLC7Theme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            DSY1105006DLC7Theme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                   // Greeting(
-                   //     name = "Android",
-                   //     modifier = Modifier.padding(innerPadding)
-                   // )
-                    HomeScreen()
 
-                }
-            }
+        setContent {
+
+            AppNav()
         }
     }
 }
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    DSY1105006DLC7Theme {
-        Greeting("Android")
-    }
-}
