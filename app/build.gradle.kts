@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -50,10 +51,24 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
-    // dependencias para la navegacion con jetpack compose.
+    // Navigation Compose
+    implementation(libs.androidx.navigation.compose)
 
-    implementation("androidx.navigation:navigation-compose:2.7.7")
+    // Lifecycle ViewModel Compose
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
 
+    // Material Icons Extended
+    implementation(libs.androidx.material.icons.extended)
+
+    // Room (Base de datos local - Offline First)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+
+    // Retrofit (API REST)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.gson)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
