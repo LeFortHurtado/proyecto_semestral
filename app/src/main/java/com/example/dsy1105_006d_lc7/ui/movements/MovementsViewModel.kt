@@ -122,15 +122,30 @@ class MovementsViewModel(private val repository: InventoryRepository) : ViewMode
     }
 
     fun registerMovement(onSuccess: () -> Unit) {
-        // Validaciones
+        // 1. Validar selección de producto
         if (formState.selectedProductId == null) {
-            formState = formState.copy(error = "Debe seleccionar un producto")
+            formState = formState.copy(error = "Debe seleccionar un producto del inventario")
             return
         }
+
+        // 2. Validar que la cantidad ingresada sea válida y mayor a 0
         val qty = formState.cantidad.toIntOrNull()
         if (qty == null || qty <= 0) {
-            formState = formState.copy(error = "Cantidad debe ser un número positivo")
+            formState = formState.copy(error = "Cantidad debe ser un número positivo mayor a 0")
             return
+        }
+
+        // 3. Validación Crítica: Regla de negocio que impide registrar Venta o Consumo
+        // si la cantidad solicitada supera las existencias actuales disponibles (evitar stock negativo)
+        val tipoNormalizado = formState.tipo.lowercase().trim()
+        if (tipoNormalizado == "venta" || tipoNormalizado == "consumo") {
+            if (qty > formState.stockActual) {
+                val operacion = if (tipoNormalizado == "venta") "Venta" else "Consumo en servicio"
+                formState = formState.copy(
+                    error = "Operación denegada ($operacion): La cantidad ingresada ($qty uds) supera la cantidad disponible en bodega (${formState.stockActual} uds). Se previenen existencias negativas."
+                )
+                return
+            }
         }
 
         viewModelScope.launch {
@@ -147,7 +162,7 @@ class MovementsViewModel(private val repository: InventoryRepository) : ViewMode
                     onSuccess()
                 },
                 onFailure = { error ->
-                    formState = formState.copy(error = error.message)
+                    formState = formState.copy(error = error.message ?: "Error al registrar el movimiento")
                 }
             )
         }

@@ -1,9 +1,7 @@
 package com.example.dsy1105_006d_lc7.ui.movements
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -18,30 +16,56 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.dsy1105_006d_lc7.TallerApp
+import com.example.dsy1105_006d_lc7.data.model.UserRole
 
 /**
  * Pantalla de formulario para registrar un nuevo movimiento de inventario.
+ * Incorpora filtrado condicional de opciones por rol (SELLER solo Ingreso, Venta y Consumo en servicio).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MovementFormScreen(
     navController: NavController,
+    role: UserRole = UserRole.ADMIN,
     vm: MovementsViewModel = viewModel(
         factory = MovementsViewModel.Factory(TallerApp.instance.repository)
     )
 ) {
     val form = vm.formState
     val state = vm.uiState
+    var typeExpanded by remember { mutableStateOf(false) }
     var productExpanded by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
 
-    val movementTypes = listOf(
-        "ingreso" to "Ingreso",
-        "venta" to "Venta",
-        "consumo" to "Consumo en Taller",
-        "ajuste" to "Ajuste de Inventario",
-        "devolucion" to "Devolución"
-    )
+    // Filtrado condicional según el rol
+    // Si es SELLER: solo Ingreso, Venta y Consumo en servicio (Ajuste y Devolución ocultos)
+    val allowedMovementTypes = remember(role) {
+        if (role == UserRole.SELLER) {
+            listOf(
+                "ingreso" to "Ingreso",
+                "venta" to "Venta",
+                "consumo" to "Consumo en servicio"
+            )
+        } else {
+            listOf(
+                "ingreso" to "Ingreso",
+                "venta" to "Venta",
+                "consumo" to "Consumo en servicio",
+                "ajuste" to "Ajuste de Inventario",
+                "devolucion" to "Devolución"
+            )
+        }
+    }
+
+    // Snackbar para retroalimentación inmediata de errores (p.ej. stock insuficiente)
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(form.error) {
+        form.error?.let {
+            snackbarHostState.showSnackbar(
+                message = it,
+                duration = SnackbarDuration.Long
+            )
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -56,7 +80,8 @@ fun MovementFormScreen(
                     containerColor = MaterialTheme.colorScheme.tertiaryContainer
                 )
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
@@ -65,7 +90,7 @@ fun MovementFormScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Error
+            // Cartel de error visual persistente
             if (form.error != null) {
                 item {
                     Card(
@@ -76,36 +101,50 @@ fun MovementFormScreen(
                     ) {
                         Row(
                             modifier = Modifier.padding(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(Icons.Default.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                            Text(form.error ?: "", color = MaterialTheme.colorScheme.onErrorContainer)
+                            Text(form.error ?: "", color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
             }
 
-            // ── Tipo de movimiento ──
+            // ── DropdownMenu filtrado por Rol ──
             item {
                 Text("Tipo de Movimiento", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
 
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    movementTypes.forEach { (value, label) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { vm.onTipoChange(value) }
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = form.tipo == value,
-                                onClick = { vm.onTipoChange(value) }
+                ExposedDropdownMenuBox(
+                    expanded = typeExpanded,
+                    onExpandedChange = { typeExpanded = !typeExpanded }
+                ) {
+                    val currentTypeLabel = allowedMovementTypes.find { it.first == form.tipo }?.second ?: "Seleccionar tipo"
+                    OutlinedTextField(
+                        value = currentTypeLabel,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Tipo de Movimiento *") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = typeExpanded,
+                        onDismissRequest = { typeExpanded = false }
+                    ) {
+                        allowedMovementTypes.forEach { (value, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label, fontWeight = if (form.tipo == value) FontWeight.Bold else FontWeight.Normal) },
+                                onClick = {
+                                    vm.onTipoChange(value)
+                                    typeExpanded = false
+                                }
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(label, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
@@ -146,7 +185,7 @@ fun MovementFormScreen(
                                             fontWeight = FontWeight.SemiBold
                                         )
                                         Text(
-                                            "${product.codigoInterno} · Stock: ${product.cantidadDisponible}",
+                                            "${product.codigoInterno} · Stock disponible: ${product.cantidadDisponible} uds",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -173,10 +212,11 @@ fun MovementFormScreen(
                     ) {
                         Row(
                             modifier = Modifier.padding(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Inventory2, contentDescription = null)
-                            Text("Stock actual: ${form.stockActual} unidades", fontWeight = FontWeight.SemiBold)
+                            Icon(Icons.Default.Inventory2, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                            Text("Stock disponible actual: ${form.stockActual} unidades", fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -193,7 +233,7 @@ fun MovementFormScreen(
                     value = form.cantidad,
                     onValueChange = vm::onCantidadChange,
                     label = { Text("Cantidad *") },
-                    placeholder = { Text("Cantidad del movimiento") },
+                    placeholder = { Text("Ej: 5") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -207,7 +247,7 @@ fun MovementFormScreen(
                     value = form.motivo,
                     onValueChange = vm::onMotivoChange,
                     label = { Text("Motivo / Observación") },
-                    placeholder = { Text("Descripción opcional del movimiento") },
+                    placeholder = { Text("Descripción u orden de trabajo") },
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)

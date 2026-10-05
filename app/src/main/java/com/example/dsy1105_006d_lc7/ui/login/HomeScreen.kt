@@ -51,15 +51,15 @@ import com.example.dsy1105_006d_lc7.R
 @Composable
 fun HomeScreen(
     navController: NavController,
-    vm: LoginViewModel = viewModel()
+    vm: AuthViewModel = viewModel()
 ) {
-    val state = vm.uiState
+    val state by vm.uiState.collectAsState()
     var showPass by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
     val executeLogin = {
         focusManager.clearFocus()
-        vm.submit { user ->
+        vm.submit { user, _ ->
             navController.navigate("muestraDatos/$user") {
                 popUpTo("login") { inclusive = true }
                 launchSingleTop = true
@@ -104,20 +104,20 @@ fun HomeScreen(
 
                 // ── LOGO Y CABECERA INSTITUCIONAL ──
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color.White,
+                    shape = RoundedCornerShape(22.dp),
+                    color = Color(0xFF002B49),
                     shadowElevation = 6.dp,
                     border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                    modifier = Modifier.size(92.dp)
+                    modifier = Modifier.size(96.dp)
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.padding(12.dp)
+                        modifier = Modifier.fillMaxSize()
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.logoduoc),
                             contentDescription = "Logo Duoc UC",
-                            contentScale = ContentScale.Fit,
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -345,56 +345,90 @@ fun HomeScreen(
                     ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Credenciales de prueba",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "admin / 123",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-
-                        FilledTonalButton(
-                            onClick = {
-                                vm.onUsernameChange("admin")
-                                vm.onPasswordChange("123")
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = Icons.Default.AutoFixHigh,
+                                imageVector = Icons.Default.Info,
                                 contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Autocompletar",
-                                style = MaterialTheme.typography.labelMedium
+                                text = "Credenciales de prueba para evaluación",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        }
+
+                        // Perfil Admin
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Administrador (Propietario)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "admin / 123",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            FilledTonalButton(
+                                onClick = {
+                                    vm.onUsernameChange("admin")
+                                    vm.onPasswordChange("123")
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text("Admin", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                        // Perfil Vendedor
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Vendedor (Operador/Asistente)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "vendedor / 123",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                            FilledTonalButton(
+                                onClick = {
+                                    vm.onUsernameChange("vendedor")
+                                    vm.onPasswordChange("123")
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text("Vendedor", style = MaterialTheme.typography.labelMedium)
+                            }
                         }
                     }
                 }

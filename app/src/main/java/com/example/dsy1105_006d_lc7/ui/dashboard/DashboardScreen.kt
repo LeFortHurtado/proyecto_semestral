@@ -33,6 +33,7 @@ import java.util.*
 @Composable
 fun DashboardScreen(
     username: String,
+    role: com.example.dsy1105_006d_lc7.data.model.UserRole = com.example.dsy1105_006d_lc7.data.model.UserRole.ADMIN,
     navController: NavController,
     dashboardVm: DashboardViewModel = viewModel(
         factory = DashboardViewModel.Factory(TallerApp.instance.repository)
@@ -51,7 +52,7 @@ fun DashboardScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "Bienvenido, $username",
+                            "Bienvenido, $username · ${if (role == com.example.dsy1105_006d_lc7.data.model.UserRole.ADMIN) "Perfil Administrador" else "Perfil Vendedor"}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -126,13 +127,15 @@ fun DashboardScreen(
                         icon = Icons.Default.Category,
                         gradientColors = listOf(Color(0xFF4facfe), Color(0xFF00f2fe))
                     )
-                    SummaryCard(
-                        modifier = Modifier.weight(1f),
-                        title = "Proveedores",
-                        value = state.totalSuppliers.toString(),
-                        icon = Icons.Default.LocalShipping,
-                        gradientColors = listOf(Color(0xFF43e97b), Color(0xFF38f9d7))
-                    )
+                    if (role == com.example.dsy1105_006d_lc7.data.model.UserRole.ADMIN) {
+                        SummaryCard(
+                            modifier = Modifier.weight(1f),
+                            title = "Proveedores",
+                            value = state.totalSuppliers.toString(),
+                            icon = Icons.Default.LocalShipping,
+                            gradientColors = listOf(Color(0xFF43e97b), Color(0xFF38f9d7))
+                        )
+                    }
                 }
             }
 
@@ -151,7 +154,7 @@ fun DashboardScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     ModuleCard(
                         title = "Productos",
-                        description = "Gestión del inventario completo",
+                        description = "Gestión y consulta del inventario",
                         icon = Icons.Default.Inventory2,
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                         onClick = { navController.navigate("products") }
@@ -163,20 +166,24 @@ fun DashboardScreen(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                         onClick = { navController.navigate("movements") }
                     )
-                    ModuleCard(
-                        title = "Reposición",
-                        description = "Productos bajo stock y cotizaciones",
-                        icon = Icons.Default.ShoppingCart,
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        onClick = { navController.navigate("reposition") }
-                    )
-                    ModuleCard(
-                        title = "Proveedores",
-                        description = "Gestión de proveedores ficticios",
-                        icon = Icons.Default.LocalShipping,
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        onClick = { navController.navigate("suppliers") }
-                    )
+                    // CONDICIONAL REQUERIMIENTO 5: Oculta por completo el acceso a los módulos
+                    // de Reposición/Pedidos y Proveedores si el usuario es SELLER.
+                    if (role == com.example.dsy1105_006d_lc7.data.model.UserRole.ADMIN) {
+                        ModuleCard(
+                            title = "Reposición",
+                            description = "Productos bajo stock y cotizaciones",
+                            icon = Icons.Default.ShoppingCart,
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            onClick = { navController.navigate("reposition") }
+                        )
+                        ModuleCard(
+                            title = "Proveedores",
+                            description = "Gestión de proveedores ficticios",
+                            icon = Icons.Default.LocalShipping,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            onClick = { navController.navigate("suppliers") }
+                        )
+                    }
                     ModuleCard(
                         title = "Ubicaciones",
                         description = "Zonas, estantes y repisas de bodega",

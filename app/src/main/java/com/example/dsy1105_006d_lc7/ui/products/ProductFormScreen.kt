@@ -23,6 +23,7 @@ import com.example.dsy1105_006d_lc7.TallerApp
 @Composable
 fun ProductFormScreen(
     navController: NavController,
+    role: com.example.dsy1105_006d_lc7.data.model.UserRole = com.example.dsy1105_006d_lc7.data.model.UserRole.ADMIN,
     vm: ProductsViewModel = viewModel(
         factory = ProductsViewModel.Factory(TallerApp.instance.repository)
     )
@@ -139,26 +140,38 @@ fun ProductFormScreen(
             }
 
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+                if (role == com.example.dsy1105_006d_lc7.data.model.UserRole.ADMIN) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = form.cantidadDisponible,
+                            onValueChange = { vm.onFormFieldChange("cantidadDisponible", it) },
+                            label = { Text("Stock Actual") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        OutlinedTextField(
+                            value = form.existenciaMinima,
+                            onValueChange = { vm.onFormFieldChange("existenciaMinima", it) },
+                            label = { Text("Stock Mínimo") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+                } else {
                     OutlinedTextField(
                         value = form.cantidadDisponible,
                         onValueChange = { vm.onFormFieldChange("cantidadDisponible", it) },
                         label = { Text("Stock Actual") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    OutlinedTextField(
-                        value = form.existenciaMinima,
-                        onValueChange = { vm.onFormFieldChange("existenciaMinima", it) },
-                        label = { Text("Stock Mínimo") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
                 }
@@ -170,20 +183,33 @@ fun ProductFormScreen(
             }
 
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedTextField(
-                        value = form.precioCompra,
-                        onValueChange = { vm.onFormFieldChange("precioCompra", it) },
-                        label = { Text("Precio Compra") },
-                        leadingIcon = { Text("$") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                if (role == com.example.dsy1105_006d_lc7.data.model.UserRole.ADMIN) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = form.precioCompra,
+                            onValueChange = { vm.onFormFieldChange("precioCompra", it) },
+                            label = { Text("Precio Compra (Referencial)") },
+                            leadingIcon = { Text("$") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        OutlinedTextField(
+                            value = form.precioVenta,
+                            onValueChange = { vm.onFormFieldChange("precioVenta", it) },
+                            label = { Text("Precio Venta") },
+                            leadingIcon = { Text("$") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+                } else {
                     OutlinedTextField(
                         value = form.precioVenta,
                         onValueChange = { vm.onFormFieldChange("precioVenta", it) },
@@ -191,7 +217,7 @@ fun ProductFormScreen(
                         leadingIcon = { Text("$") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
                 }

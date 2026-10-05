@@ -33,6 +33,7 @@ import java.util.*
 @Composable
 fun MovementsScreen(
     navController: NavController,
+    role: com.example.dsy1105_006d_lc7.data.model.UserRole = com.example.dsy1105_006d_lc7.data.model.UserRole.ADMIN,
     vm: MovementsViewModel = viewModel(
         factory = MovementsViewModel.Factory(TallerApp.instance.repository)
     )
@@ -47,14 +48,25 @@ fun MovementsScreen(
         }
     }
 
-    val movementTypes = listOf(
-        null to "Todos",
-        "ingreso" to "Ingresos",
-        "venta" to "Ventas",
-        "consumo" to "Consumos",
-        "ajuste" to "Ajustes",
-        "devolucion" to "Devoluciones"
-    )
+    val movementTypes = remember(role) {
+        if (role == com.example.dsy1105_006d_lc7.data.model.UserRole.SELLER) {
+            listOf(
+                null to "Todos",
+                "ingreso" to "Ingresos",
+                "venta" to "Ventas",
+                "consumo" to "Consumos"
+            )
+        } else {
+            listOf(
+                null to "Todos",
+                "ingreso" to "Ingresos",
+                "venta" to "Ventas",
+                "consumo" to "Consumos",
+                "ajuste" to "Ajustes",
+                "devolucion" to "Devoluciones"
+            )
+        }
+    }
 
     Scaffold(
         topBar = {

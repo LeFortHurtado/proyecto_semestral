@@ -243,6 +243,21 @@ class ProductsViewModel(private val repository: InventoryRepository) : ViewModel
         }
     }
 
+    /**
+     * Permite al Administrador modificar la existencia mínima directamente.
+     */
+    fun updateMinStock(product: ProductEntity, newMinStock: Int) {
+        viewModelScope.launch {
+            try {
+                val updated = product.copy(existenciaMinima = newMinStock)
+                repository.updateProduct(updated)
+                uiState = uiState.copy(message = "Existencia mínima de '${product.nombre}' actualizada a $newMinStock uds")
+            } catch (e: Exception) {
+                uiState = uiState.copy(message = "Error al actualizar stock mínimo: ${e.message}")
+            }
+        }
+    }
+
     // ── Factory ──
 
     class Factory(private val repository: InventoryRepository) : ViewModelProvider.Factory {

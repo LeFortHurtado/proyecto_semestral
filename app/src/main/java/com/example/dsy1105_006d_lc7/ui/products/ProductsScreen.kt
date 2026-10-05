@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -23,22 +25,27 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.dsy1105_006d_lc7.TallerApp
 import com.example.dsy1105_006d_lc7.data.local.entity.ProductWithDetails
+import com.example.dsy1105_006d_lc7.data.model.UserRole
 
 /**
- * Pantalla de listado de productos con búsqueda y filtro por categoría.
+ * Pantalla de inventario de productos con control de acceso por roles:
+ * - ADMIN: Gestión completa (crear, editar, eliminar, ajustar stock mínimo y ver precio de compra).
+ * - SELLER: Consulta de productos, búsqueda por código/nombre, stock actual, ubicación y precio de venta.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductsScreen(
     navController: NavController,
+    role: UserRole = UserRole.ADMIN,
     vm: ProductsViewModel = viewModel(
         factory = ProductsViewModel.Factory(TallerApp.instance.repository)
     )
 ) {
     val state = vm.uiState
     var showDeleteDialog by remember { mutableStateOf<ProductWithDetails?>(null) }
+    var selectedProductForDetail by remember { mutableStateOf<ProductWithDetails?>(null) }
 
-    // Mostrar snackbar con mensajes
+    // Snackbar para notificaciones
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -50,7 +57,16 @@ fun ProductsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Productos", fontWeight = FontWeight.Bold) },
+                title = {
+                    Column {
+                        Text("Inventario de Productos", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = if (role == UserRole.ADMIN) "Modo Administrador (Total)" else "Modo Vendedor (Solo Consulta)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
@@ -62,14 +78,17 @@ fun ProductsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    vm.initFormForCreate()
-                    navController.navigate("productForm")
-                },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Agregar producto")
+            // Solo el ADMIN puede crear productos nuevos desde el inventario
+            if (role == UserRole.ADMIN) {
+                FloatingActionButton(
+                    onClick = {
+                        vm.initFormForCreate()
+                        navController.navigate("productForm")
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Agregar producto")
+                }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -79,11 +98,11 @@ fun ProductsScreen(
                 .padding(innerPadding)
                 .fillMaxSize()
         ) {
-            // ── Barra de búsqueda ──
+            // ── Barra de búsqueda (Permitida para ADMIN y SELLER) ──
             OutlinedTextField(
                 value = state.searchQuery,
                 onValueChange = vm::onSearchQueryChange,
-                placeholder = { Text("Buscar por nombre o código...") },
+                placeholder = { Text("Buscar por código o nombre de repuesto...") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (state.searchQuery.isNotBlank()) {
@@ -128,7 +147,7 @@ fun ProductsScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ── Lista de productos ──
+            // ── Listado reactivo de productos ──
             if (state.isLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -150,7 +169,7 @@ fun ProductsScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "No hay productos",
+                            "No se encontraron productos",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -159,11 +178,13 @@ fun ProductsScreen(
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(state.products) { productWithDetails ->
                         ProductItem(
                             productWithDetails = productWithDetails,
+                            role = role,
+                            onOpenDetail = { selectedProductForDetail = productWithDetails },
                             onEdit = {
                                 vm.initFormForEdit(productWithDetails.product)
                                 navController.navigate("productForm")
@@ -178,44 +199,69 @@ fun ProductsScreen(
             }
         }
 
-        // ── Diálogo de confirmación para eliminar ──
-        showDeleteDialog?.let { prodWithDetails ->
-            AlertDialog(
-                onDismissRequest = { showDeleteDialog = null },
-                title = { Text("Eliminar Producto") },
-                text = { Text("¿Está seguro de eliminar \"${prodWithDetails.product.nombre}\"? Esta acción no se puede deshacer.") },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            vm.deleteProduct(prodWithDetails.product)
-                            showDeleteDialog = null
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("Eliminar")
-                    }
+        // ── Composable de Detalle de Producto con condicionales por UserRole ──
+        selectedProductForDetail?.let { prodWithDetails ->
+            ProductDetailDialog(
+                productWithDetails = prodWithDetails,
+                role = role,
+                onDismiss = { selectedProductForDetail = null },
+                onUpdateMinStock = { newMinStock ->
+                    vm.updateMinStock(prodWithDetails.product, newMinStock)
+                    selectedProductForDetail = null
                 },
-                dismissButton = {
-                    TextButton(onClick = { showDeleteDialog = null }) {
-                        Text("Cancelar")
-                    }
+                onDelete = {
+                    val toDelete = prodWithDetails
+                    selectedProductForDetail = null
+                    showDeleteDialog = toDelete
                 }
             )
+        }
+
+        // ── Diálogo de confirmación para eliminar (Solo ADMIN) ──
+        if (role == UserRole.ADMIN) {
+            showDeleteDialog?.let { prodWithDetails ->
+                AlertDialog(
+                    onDismissRequest = { showDeleteDialog = null },
+                    title = { Text("Eliminar Producto") },
+                    text = { Text("¿Está seguro de eliminar permanentemente \"${prodWithDetails.product.nombre}\"? Esta acción no se puede deshacer.") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                vm.deleteProduct(prodWithDetails.product)
+                                showDeleteDialog = null
+                            },
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Eliminar")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteDialog = null }) {
+                            Text("Cancelar")
+                        }
+                    }
+                )
+            }
         }
     }
 }
 
+/**
+ * Tarjeta de producto en inventario.
+ * Aplica condicionales según el UserRole para ocultar precios de compra y botón de eliminar.
+ */
 @Composable
 fun ProductItem(
     productWithDetails: ProductWithDetails,
+    role: UserRole,
+    onOpenDetail: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val product = productWithDetails.product
     val location = productWithDetails.location
-    val supplier = productWithDetails.supplier
 
     val stockColor = when {
         product.cantidadDisponible <= 0 -> Color(0xFFf5576c)
@@ -224,7 +270,9 @@ fun ProductItem(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenDetail),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -245,10 +293,11 @@ fun ProductItem(
                     Text(
                         product.codigoInterno,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
-                // Indicador de stock
+                // Existencias actuales (Visible para ADMIN y SELLER)
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
@@ -266,38 +315,42 @@ fun ProductItem(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Detalles
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    DetailRow(Icons.Default.Category, "Categoría", product.categoria)
-                    if (location != null) {
-                        DetailRow(Icons.Default.Place, "Ubicación", "${location.zona} / ${location.estante} / ${location.repisa}")
-                    }
-                    if (supplier != null) {
-                        DetailRow(Icons.Default.LocalShipping, "Proveedor", supplier.nombreFicticio)
-                    }
+            // ── Ubicación (zona, estante, repisa) - Visible para SELLER y ADMIN ──
+            Column {
+                DetailRow(Icons.Default.Category, "Categoría", product.categoria)
+                if (location != null) {
+                    DetailRow(
+                        Icons.Default.Place,
+                        "Ubicación",
+                        "Zona ${location.zona} · Estante ${location.estante} · Repisa ${location.repisa}"
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Precios
+            // ── Precios con condicional de visibilidad ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    "Compra: \$${String.format("%,.0f", product.precioCompra)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // CONDICIONAL: Ocultar explícitamente el Precio de compra referencial al SELLER
+                if (role == UserRole.ADMIN) {
+                    Text(
+                        "Compra Ref: \$${String.format("%,.0f", product.precioCompra)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+
+                // El precio de venta siempre es visible para el vendedor
                 Text(
                     "Venta: \$${String.format("%,.0f", product.precioVenta)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
@@ -312,32 +365,274 @@ fun ProductItem(
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Acciones
+            // ── Acciones condicionales por rol ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                // Botón detalle disponible para ambos perfiles
+                TextButton(onClick = onOpenDetail) {
+                    Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Editar")
+                    Text("Ver Detalle")
                 }
-                TextButton(
-                    onClick = onDelete,
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Eliminar")
+
+                // CONDICIONAL: Botón de Editar producto (Solo ADMIN)
+                if (role == UserRole.ADMIN) {
+                    TextButton(onClick = onEdit) {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Editar")
+                    }
+
+                    // CONDICIONAL: Botón o acción de Eliminar producto (Oculto al SELLER, solo ADMIN)
+                    TextButton(
+                        onClick = onDelete,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Eliminar")
+                    }
                 }
             }
         }
     }
+}
+
+/**
+ * Composable de Detalle de Producto.
+ * Aplica estrictamente los condicionales requeridos para UserRole:
+ * - Oculta botón de Eliminar al SELLER.
+ * - Oculta campo y botón para Modificar la existencia mínima al SELLER.
+ * - Oculta explícitamente el Precio de compra referencial al SELLER.
+ * - Muestra al SELLER: catálogo, stock actual, búsqueda y ubicación (zona, estante, repisa).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProductDetailDialog(
+    productWithDetails: ProductWithDetails,
+    role: UserRole,
+    onDismiss: () -> Unit,
+    onUpdateMinStock: (Int) -> Unit,
+    onDelete: () -> Unit
+) {
+    val product = productWithDetails.product
+    val location = productWithDetails.location
+    val supplier = productWithDetails.supplier
+
+    var minStockInput by remember(product.existenciaMinima) {
+        mutableStateOf(product.existenciaMinima.toString())
+    }
+
+    val stockBadgeColor = when {
+        product.cantidadDisponible <= 0 -> Color(0xFFf5576c)
+        product.cantidadDisponible <= product.existenciaMinima -> Color(0xFFffa726)
+        else -> Color(0xFF43e97b)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = product.nombre,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Código: ${product.codigoInterno}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Surface(
+                    color = stockBadgeColor.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "${product.cantidadDisponible} uds",
+                        color = stockBadgeColor,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (product.descripcion.isNotBlank()) {
+                    Text(
+                        text = product.descripcion,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                DetailRow(Icons.Default.Category, "Categoría", product.categoria)
+
+                // ── Ubicación de bodega (zona, estante, repisa) - Visible para SELLER ──
+                val ubicacionTexto = location?.let {
+                    "Zona ${it.zona} · Estante ${it.estante} · Repisa ${it.repisa}"
+                } ?: "Sin ubicación asignada"
+                DetailRow(Icons.Default.Place, "Ubicación en Bodega", ubicacionTexto)
+
+                // Proveedor visible para ADMIN
+                if (role == UserRole.ADMIN && supplier != null) {
+                    DetailRow(Icons.Default.LocalShipping, "Proveedor", supplier.nombreFicticio)
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                // ── Precios ──
+                Text(
+                    text = "Precios",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                // Precio de venta: Visible para todos (Vendedor y Admin)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Precio Venta al Público:", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "$${String.format("%,.0f", product.precioVenta)}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                // CONDICIONAL 1: Ocultar explícitamente el Precio de compra referencial al SELLER
+                if (role == UserRole.ADMIN) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Lock,
+                                    contentDescription = "Sensible",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    "Precio Compra Referencial:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Text(
+                                "$${String.format("%,.0f", product.precioCompra)}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                // CONDICIONAL 2: Campo y botón para Modificar la existencia mínima (Solo ADMIN)
+                if (role == UserRole.ADMIN) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Modificar Existencia Mínima",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = minStockInput,
+                                onValueChange = { minStockInput = it },
+                                label = { Text("Mínimo") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            Button(
+                                onClick = {
+                                    val newMin = minStockInput.toIntOrNull()
+                                    if (newMin != null && newMin >= 0) {
+                                        onUpdateMinStock(newMin)
+                                    }
+                                },
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Guardar")
+                            }
+                        }
+                    }
+                } else {
+                    // Para el SELLER: Solo lectura de estado de existencias
+                    Text(
+                        text = "Existencias disponibles: ${product.cantidadDisponible} unidades",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                // CONDICIONAL 3: Botón o acción de Eliminar producto (Oculto al SELLER, solo ADMIN)
+                if (role == UserRole.ADMIN) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = onDelete,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Eliminar Producto")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cerrar")
+            }
+        }
+    )
 }
 
 @Composable
