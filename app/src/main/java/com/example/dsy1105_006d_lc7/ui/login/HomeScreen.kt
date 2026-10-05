@@ -1,387 +1,424 @@
 package com.example.dsy1105_006d_lc7.ui.login
 
-
-
-//HomeScreen
-
-
-
-import android.R.attr.enabled
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-
 import androidx.compose.foundation.background
-
-import androidx.compose.foundation.layout.Arrangement
-
-import androidx.compose.foundation.layout.Column
-
-import androidx.compose.foundation.layout.Row
-
-import androidx.compose.foundation.layout.Spacer
-
-import androidx.compose.foundation.layout.fillMaxSize
-
-import androidx.compose.foundation.layout.fillMaxWidth
-
-import androidx.compose.foundation.layout.height
-
-import androidx.compose.foundation.layout.padding
-
-import androidx.compose.material3.Button
-
-import androidx.compose.material3.ColorScheme
-
-import androidx.compose.material3.ExperimentalMaterial3Api
-
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-
-import androidx.compose.material3.Scaffold
-
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-
-import androidx.compose.material3.TopAppBar
-
-import androidx.compose.material3.darkColorScheme
-
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-
 import androidx.compose.ui.Modifier
-
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-
 import androidx.compose.ui.layout.ContentScale
-
-import com.example.dsy1105_006d_lc7.R
-
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
-
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
+import com.example.dsy1105_006d_lc7.R
 
-
-@OptIn(ExperimentalMaterial3Api::class)
-
-// Permite usar funciones Material 3 qe son experimentales
-
-@Composable // Genera Interfz Garfica
-
-
-
+/**
+ * Pantalla de Inicio de Sesión (Login) con diseño UI/UX optimizado:
+ * - Tarjeta elevada con jerarquía visual clara.
+ * - Iconos informativos e interactivos en los campos de texto.
+ * - Manejo de teclado móvil (ImeAction.Next y ImeAction.Done).
+ * - Soporte para scroll vertical con teclado desplegado (imePadding).
+ * - Mensajes de error claros e integrados visualmente.
+ * - Acceso rápido para pruebas de evaluación docente.
+ */
+@Composable
 fun HomeScreen(
     navController: NavController,
-    vm: LoginViewModel = viewModel() // Conectamos la arquitectura
-){
-    val state =vm.uiState
-    var showPass by remember{ mutableStateOf(false) }
+    vm: LoginViewModel = viewModel()
+) {
+    val state = vm.uiState
+    var showPass by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
 
-    // darkColorScheme es una funcion de material3 que define un color oscuro
+    val executeLogin = {
+        focusManager.clearFocus()
+        vm.submit { user ->
+            navController.navigate("muestraDatos/$user") {
+                popUpTo("login") { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
 
-    val ColorScheme = darkColorScheme(
-
-        primary= Color(0xFF98222E),
-
-        onPrimary = Color.White,
-
-        onSurface = Color(0xFF333333), //Gris
-
-    ) // fin dark
-
-
-
-
-
-    MaterialTheme(
-
-        colorScheme = ColorScheme
-
-    ){ // inicio Aplicar Material
-
-
-
-
-
-
-
-        Scaffold (
-
-            // Crea Estuctra basica de la pantalla Se define topBar, BottomBar
-
-            topBar = {
-
-                TopAppBar(title = {Text("Mi Primer App",
-
-                    color =MaterialTheme.colorScheme.onPrimary,
-
-                    )})
-
-
-
-                // Crea un AppBar con un titulo
-
-
-
-            }// fin topBar
-
-        ) // fin Scaff
-
-        {// Inicio Inner
-
-                innerPadding ->
-
-            // Representa el espacio interno para que no choque con el topBar
-
-
-
-            Column ( //  Colaca los elementos de la Ui
-
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            // Fondo decorativo sutil superior con degradado
+            Box(
                 modifier = Modifier
-
-                    .padding( innerPadding)
-
-                    // Evita que quede oculto
-
-                    .fillMaxSize() // Hace que la columnna tome el todo el tamaño
-
-                    .padding(16.dp)
-
-                    .background(Color(0xFFF0F0F0)), // gris Claro
-
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-
-                horizontalAlignment = Alignment.CenterHorizontally // Centra horizontalmente
-
-                //Define que elementos dentro la columna estaran separados por 20.dp
-
-            )// fin column
-
-            {// inicio Contenido
-
-                Text(text="Bienvenido !",
-
-                    style= MaterialTheme.typography.headlineMedium,
-
-                    color=MaterialTheme.colorScheme.primary
-
-
-
-
-
-                ) // Muestra un texto simple en la pantalla
-
-
-
-
-
-
-
-
-
-                Image( // insertar una imagen en la interfaz
-
-                    painter= painterResource(id = R.drawable.logoduoc),
-
-                    contentDescription = "Logo App",
-
-                    modifier = Modifier
-
-                        .fillMaxWidth()
-
-                        .height(150.dp),
-
-                    contentScale = ContentScale.Fit
-
-                    // Ajusta la imagen para que encaje dentro del espacio
-
-
-
-                ) // Fin Image
-
-
-
-
-
-// agregar un espacio entre la imagen y el boton
-
-
-
-                Spacer(modifier = Modifier.height(66.dp))
-
-
-
-
-
-
-
-
-
-                Row(
-
-                    modifier = Modifier
-
-                        .fillMaxWidth()
-
-                        .padding(horizontal = 16.dp),
-
-                    horizontalArrangement = Arrangement.SpaceBetween
-
-                )// Fin Row
-
-                {// Aplica row
-
-                    Text("texto uno",
-
-                        style =MaterialTheme.typography.bodyLarge.copy(
-
-                            color=MaterialTheme.colorScheme.onSurface.copy(alpha=0.8f),
-
-                            fontWeight = FontWeight.Bold),
-
-                        modifier = Modifier
-
-                            .padding(end=8.dp)
-
-                    )// fin texto 1
-
-
-
-
-
-                    Text("texto dos",
-
-                        style =MaterialTheme.typography.bodyLarge.copy(
-
-                            color=MaterialTheme.colorScheme.onSurface.copy(alpha=0.8f),
-
-                            fontWeight = FontWeight.Bold),
-
-                        modifier = Modifier
-
-                            .padding(end=8.dp)
-
-                    )// fin texto 1
-
-                } // fin Aplica row
-
-                OutlinedTextField(
-                    value=state.username,
-                    onValueChange = vm::onUsernameChange,
-                    label={Text("Usuario")},
-                    singleLine = true,
-                    modifier= Modifier.fillMaxWidth(0.95f)
+                    .fillMaxWidth()
+                    .height(260.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                                MaterialTheme.colorScheme.background
+                            )
+                        )
+                    )
+            )
+
+            // Contenedor principal con soporte para scroll al abrir el teclado
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .imePadding()
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // ── LOGO Y CABECERA INSTITUCIONAL ──
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White,
+                    shadowElevation = 6.dp,
+                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    modifier = Modifier.size(92.dp)
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.logoduoc),
+                            contentDescription = "Logo Duoc UC",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Taller Mecánico",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 26.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground
                 )
 
-    OutlinedTextField(
-        value=state.password,
-        onValueChange = vm::onPasswordChange,
-        label={Text("Contraseña")},
-        singleLine = true,
-        visualTransformation = if (showPass)
-            VisualTransformation.None else PasswordVisualTransformation(),
-        trailingIcon = {
-            TextButton(onClick = {showPass = !showPass}){
-                Text(if (showPass) "Ocultar" else "Ver")
+                Text(
+                    text = "Control de Inventario & Reposición",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(28.dp))
+
+                // ── TARJETA DEL FORMULARIO DE ACCESO ──
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Título interno del formulario
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Iniciar Sesión",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Ingresa tus datos para ingresar al sistema",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Campo de Usuario
+                        OutlinedTextField(
+                            value = state.username,
+                            onValueChange = vm::onUsernameChange,
+                            label = { Text("Usuario") },
+                            placeholder = { Text("admin") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Usuario",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            trailingIcon = {
+                                if (state.username.isNotEmpty()) {
+                                    IconButton(onClick = { vm.onUsernameChange("") }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Clear,
+                                            contentDescription = "Borrar texto",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                            isError = state.error != null,
+                            shape = RoundedCornerShape(14.dp),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Text,
+                                imeAction = ImeAction.Next
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Campo de Contraseña
+                        OutlinedTextField(
+                            value = state.password,
+                            onValueChange = vm::onPasswordChange,
+                            label = { Text("Contraseña") },
+                            placeholder = { Text("••••••••") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Key,
+                                    contentDescription = "Contraseña",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            trailingIcon = {
+                                IconButton(onClick = { showPass = !showPass }) {
+                                    Icon(
+                                        imageVector = if (showPass) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = if (showPass) "Ocultar contraseña" else "Mostrar contraseña",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            },
+                            visualTransformation = if (showPass) VisualTransformation.None else PasswordVisualTransformation(),
+                            singleLine = true,
+                            isError = state.error != null,
+                            shape = RoundedCornerShape(14.dp),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Password,
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = { executeLogin() }
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        // Cartel de Error con animación
+                        AnimatedVisibility(
+                            visible = state.error != null,
+                            enter = fadeIn(),
+                            exit = fadeOut()
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.errorContainer,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 14.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ErrorOutline,
+                                        contentDescription = "Error",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = state.error ?: "",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // Botón de Inicio de Sesión
+                        Button(
+                            onClick = { executeLogin() },
+                            enabled = !state.isLoading,
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp)
+                        ) {
+                            if (state.isLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    strokeWidth = 2.5.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "Validando...",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Login,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "Iniciar Sesión",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // ── TARJETA DE CREDENCIALES DE PRUEBA / DEMO ──
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Credenciales de prueba",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "admin / 123",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        FilledTonalButton(
+                            onClick = {
+                                vm.onUsernameChange("admin")
+                                vm.onPasswordChange("123")
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoFixHigh,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Autocompletar",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Pie de página
+                Text(
+                    text = "DSY1105 • Proyecto Semestral",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
-
-        }, // fin trail
-
-        modifier=Modifier.fillMaxWidth(0.95f)
-    )// fin pass
-
-if(state.error!=null){
-    Spacer(Modifier.height(8.dp))
-    Text(
-        text=state.error ?: "",
-        color=MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.Bold
-
-    )
+        }
+    }
 }
 
-
-
-// agregar un espacio entre la imagen y el boton
-
-
-
-                Spacer(modifier = Modifier.height(66.dp))
-
-
-
-                Button(onClick = {/* accion futura*/
-                    vm.submit { user ->
-                        navController.navigate("muestraDatos/$user")
-                        {
-                            popUpTo("login") { inclusive = true } // no volver al login
-                            launchSingleTop = true
-                        }// fin navigate
-
-                    }// fin submit
-                },enabled = !state.isLoading,
-                    modifier = Modifier.fillMaxWidth(0.6f)
-                )
-
-                {// aplicacion de propiedad
-                    //Text("Presioname")
-Text(if(state.isLoading) "Validando" else "Inicio sesision"
-
-)
-
-                } // fin boton
-
-
-
-
-
-
-
-            }// fin Contenido
-
-
-
-        } // Fin inner
-
-
-
-
-
-    } // fin Aplicar Material
-
-}// Fin HomeScreen
-
-
-
-
-
-@Preview(showBackground = true) // Genera la vista
-
-@Composable // Genera Interfz Garfica
-
-
-
-fun HomeScreenPreview(){
-
-// creamos un NavController
-    val navController= rememberNavController()
-// simular viewmodel
-val vm= LoginViewModel()
-    HomeScreen(navController=navController, vm=vm)
-
-
-
-}// Fin HomeScreen
+@Preview(showBackground = true)
+@Composable
+fun HomeScreenPreview() {
+    val navController = rememberNavController()
+    val vm = LoginViewModel()
+    HomeScreen(navController = navController, vm = vm)
+}
