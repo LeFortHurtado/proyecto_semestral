@@ -27,13 +27,15 @@ data class MovementsUiState(
  * Estado del formulario para registrar un movimiento.
  */
 data class MovementFormState(
+    val selectedProduct: ProductEntity? = null,
     val selectedProductId: Long? = null,
     val selectedProductName: String = "",
     val tipo: String = "ingreso",
     val cantidad: String = "",
     val motivo: String = "",
     val stockActual: Int = 0,
-    val error: String? = null
+    val error: String? = null,
+    val scanSuccessMessage: String? = null
 )
 
 /**
@@ -94,6 +96,10 @@ class MovementsViewModel(private val repository: InventoryRepository) : ViewMode
         uiState = uiState.copy(message = null)
     }
 
+    fun clearScanSuccessMessage() {
+        formState = formState.copy(scanSuccessMessage = null)
+    }
+
     // ── Formulario ──
 
     fun initForm() {
@@ -102,11 +108,69 @@ class MovementsViewModel(private val repository: InventoryRepository) : ViewMode
 
     fun onProductSelected(product: ProductEntity) {
         formState = formState.copy(
+            selectedProduct = product,
             selectedProductId = product.id,
             selectedProductName = "${product.codigoInterno} - ${product.nombre}",
             stockActual = product.cantidadDisponible,
             error = null
         )
+    }
+
+    /**
+     * Procesa el código QR escaneado con la cámara.
+     * Identifica el producto por su ID numérico (ej: "3", "ID: 3") o código interno ("FILT-001"),
+     * y carga inmediatamente sus datos en el formulario del movimiento.
+     */
+    fun onQrCodeScanned(qrContent: String, onScannedResult: (Boolean, String) -> Unit) {
+        val trimmed = qrContent.trim()
+        if (trimmed.isBlank()) {
+            formState = formState.copy(error = "El código QR leído está vacío")
+            onScannedResult(false, "Código QR vacío")
+            return
+        }
+
+        val directId = trimmed.toLongOrNull()
+        val idRegex = Regex("""(?:id|producto)[:=\s]+(\d+)""", RegexOption.IGNORE_CASE)
+        val extractedId = directId ?: idRegex.find(trimmed)?.groupValues?.get(1)?.toLongOrNull()
+
+        // 1. Buscar en memoria entre los productos ya cargados
+        var matched = if (extractedId != null) {
+            uiState.products.find { it.id == extractedId }
+        } else null
+
+        if (matched == null) {
+            matched = uiState.products.find {
+                it.codigoInterno.equals(trimmed, ignoreCase = true)
+            }
+        }
+
+        if (matched != null) {
+            onProductSelected(matched)
+            val msg = "Producto escaneado: ${matched.nombre} (Stock: ${matched.cantidadDisponible})"
+            formState = formState.copy(scanSuccessMessage = msg, error = null)
+            onScannedResult(true, msg)
+            return
+        }
+
+        // 2. Si no estaba aún en memoria, consultar la base de datos Room
+        viewModelScope.launch {
+            val dbProduct = if (extractedId != null) {
+                repository.getProductById(extractedId)
+            } else {
+                repository.getProductByCode(trimmed)
+            }
+
+            if (dbProduct != null) {
+                onProductSelected(dbProduct)
+                val msg = "Producto escaneado: ${dbProduct.nombre} (Stock: ${dbProduct.cantidadDisponible})"
+                formState = formState.copy(scanSuccessMessage = msg, error = null)
+                onScannedResult(true, msg)
+            } else {
+                val err = "No se encontró ningún producto con ID o código: '$trimmed'"
+                formState = formState.copy(error = err)
+                onScannedResult(false, err)
+            }
+        }
     }
 
     fun onTipoChange(tipo: String) {
