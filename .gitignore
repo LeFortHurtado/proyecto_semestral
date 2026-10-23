@@ -13,3 +13,10 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Documentación interna (no subir al repo)
+informe.md
+GUIA_ESTUDIO_DEFENSA_CODIGO.md
+GUIA_PREGUNTAS_BASICAS_DEFENSA.md
+DEFENSA_PREGUNTAS_EXAMEN.md
+LISTA_PRODUCTOS_QR.md
