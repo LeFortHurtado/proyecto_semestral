@@ -2,6 +2,7 @@ package com.example.dsy1105_006d_lc7.ui.products
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -15,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.dsy1105_006d_lc7.TallerApp
+import com.example.dsy1105_006d_lc7.data.model.UserRole
 
 /**
  * Pantalla de formulario para crear o editar un producto.
@@ -23,16 +25,34 @@ import com.example.dsy1105_006d_lc7.TallerApp
 @Composable
 fun ProductFormScreen(
     navController: NavController,
-    role: com.example.dsy1105_006d_lc7.data.model.UserRole = com.example.dsy1105_006d_lc7.data.model.UserRole.ADMIN,
+    role: UserRole = UserRole.ADMIN,
+    productId: Long = -1L,
     vm: ProductsViewModel = viewModel(
         factory = ProductsViewModel.Factory(TallerApp.instance.repository)
     )
 ) {
+    LaunchedEffect(productId) {
+        vm.ensureFormLoaded(productId)
+    }
+
     val form = vm.formState
     val state = vm.uiState
 
+    var estadoExpanded by remember { mutableStateOf(false) }
     var supplierExpanded by remember { mutableStateOf(false) }
     var locationExpanded by remember { mutableStateOf(false) }
+
+    val listState = rememberLazyListState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(form.error) {
+        val error = form.error ?: return@LaunchedEffect
+        listState.animateScrollToItem(0)
+        snackbarHostState.showSnackbar(
+            message = error,
+            duration = SnackbarDuration.Short
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -52,9 +72,11 @@ fun ProductFormScreen(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize(),
@@ -94,7 +116,7 @@ fun ProductFormScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    enabled = !form.isEditing // No editar código en modo edición
+                    enabled = !form.isSaving
                 )
             }
 
@@ -106,7 +128,8 @@ fun ProductFormScreen(
                     placeholder = { Text("Ej: Filtro de aceite genérico") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !form.isSaving
                 )
             }
 
@@ -118,7 +141,8 @@ fun ProductFormScreen(
                     placeholder = { Text("Descripción detallada del producto") },
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !form.isSaving
                 )
             }
 
@@ -130,8 +154,48 @@ fun ProductFormScreen(
                     placeholder = { Text("Ej: Filtros, Aceites, Frenos") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !form.isSaving
                 )
+            }
+
+            item {
+                val estadoOptions = listOf(
+                    "activo" to "Activo",
+                    "descontinuado" to "Descontinuado"
+                )
+                val estadoLabel = estadoOptions.find { it.first == form.estado }?.second ?: form.estado
+                ExposedDropdownMenuBox(
+                    expanded = estadoExpanded,
+                    onExpandedChange = { if (!form.isSaving) estadoExpanded = !estadoExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = estadoLabel,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Estado") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = estadoExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !form.isSaving
+                    )
+                    ExposedDropdownMenu(
+                        expanded = estadoExpanded,
+                        onDismissRequest = { estadoExpanded = false }
+                    ) {
+                        estadoOptions.forEach { (value, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    vm.onEstadoSelected(value)
+                                    estadoExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
 
             item {
@@ -140,7 +204,7 @@ fun ProductFormScreen(
             }
 
             item {
-                if (role == com.example.dsy1105_006d_lc7.data.model.UserRole.ADMIN) {
+                if (role == UserRole.ADMIN) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -152,7 +216,8 @@ fun ProductFormScreen(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !form.isSaving
                         )
                         OutlinedTextField(
                             value = form.existenciaMinima,
@@ -161,7 +226,8 @@ fun ProductFormScreen(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !form.isSaving
                         )
                     }
                 } else {
@@ -172,7 +238,8 @@ fun ProductFormScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !form.isSaving
                     )
                 }
             }
@@ -183,7 +250,7 @@ fun ProductFormScreen(
             }
 
             item {
-                if (role == com.example.dsy1105_006d_lc7.data.model.UserRole.ADMIN) {
+                if (role == UserRole.ADMIN) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -196,7 +263,8 @@ fun ProductFormScreen(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true,
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !form.isSaving
                         )
                         OutlinedTextField(
                             value = form.precioVenta,
@@ -206,7 +274,8 @@ fun ProductFormScreen(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true,
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !form.isSaving
                         )
                     }
                 } else {
@@ -218,7 +287,8 @@ fun ProductFormScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !form.isSaving
                     )
                 }
             }
@@ -232,7 +302,7 @@ fun ProductFormScreen(
             item {
                 ExposedDropdownMenuBox(
                     expanded = supplierExpanded,
-                    onExpandedChange = { supplierExpanded = !supplierExpanded }
+                    onExpandedChange = { if (!form.isSaving) supplierExpanded = !supplierExpanded }
                 ) {
                     OutlinedTextField(
                         value = state.suppliers.find { it.id == form.proveedorId }?.nombreFicticio ?: "Sin proveedor",
@@ -243,7 +313,8 @@ fun ProductFormScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .menuAnchor(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !form.isSaving
                     )
                     ExposedDropdownMenu(
                         expanded = supplierExpanded,
@@ -273,10 +344,14 @@ fun ProductFormScreen(
             item {
                 ExposedDropdownMenuBox(
                     expanded = locationExpanded,
-                    onExpandedChange = { locationExpanded = !locationExpanded }
+                    onExpandedChange = { if (!form.isSaving) locationExpanded = !locationExpanded }
                 ) {
-                    val locationText = state.locations.find { it.id == form.ubicacionId }?.let {
-                        "${it.zona} / ${it.estante} / ${it.repisa}"
+                    val locationText = state.locations.find { it.id == form.ubicacionId }?.let { loc ->
+                        if (loc.posicion.isNotBlank()) {
+                            "${loc.zona} / ${loc.estante} / ${loc.repisa} (${loc.posicion})"
+                        } else {
+                            "${loc.zona} / ${loc.estante} / ${loc.repisa}"
+                        }
                     } ?: "Sin ubicación"
 
                     OutlinedTextField(
@@ -288,7 +363,8 @@ fun ProductFormScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .menuAnchor(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !form.isSaving
                     )
                     ExposedDropdownMenu(
                         expanded = locationExpanded,
@@ -302,8 +378,13 @@ fun ProductFormScreen(
                             }
                         )
                         state.locations.forEach { location ->
+                            val itemLabel = if (location.posicion.isNotBlank()) {
+                                "${location.zona} / ${location.estante} / ${location.repisa} (${location.posicion})"
+                            } else {
+                                "${location.zona} / ${location.estante} / ${location.repisa}"
+                            }
                             DropdownMenuItem(
-                                text = { Text("${location.zona} / ${location.estante} / ${location.repisa}") },
+                                text = { Text(itemLabel) },
                                 onClick = {
                                     vm.onLocationSelected(location.id)
                                     locationExpanded = false
@@ -319,12 +400,21 @@ fun ProductFormScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = { vm.saveProduct { navController.popBackStack() } },
+                    enabled = !form.isSaving,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Icon(Icons.Default.Save, contentDescription = null)
+                    if (form.isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Icon(Icons.Default.Save, contentDescription = null)
+                    }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         if (form.isEditing) "Actualizar Producto" else "Crear Producto",

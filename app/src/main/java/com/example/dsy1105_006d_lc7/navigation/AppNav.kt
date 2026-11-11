@@ -4,12 +4,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.dsy1105_006d_lc7.TallerApp
 import com.example.dsy1105_006d_lc7.data.model.UserRole
 import com.example.dsy1105_006d_lc7.ui.dashboard.DashboardScreen
 import com.example.dsy1105_006d_lc7.ui.locations.LocationsScreen
@@ -19,6 +21,7 @@ import com.example.dsy1105_006d_lc7.ui.movements.MovementFormScreen
 import com.example.dsy1105_006d_lc7.ui.movements.MovementsScreen
 import com.example.dsy1105_006d_lc7.ui.products.ProductFormScreen
 import com.example.dsy1105_006d_lc7.ui.products.ProductsScreen
+import com.example.dsy1105_006d_lc7.ui.products.ProductsViewModel
 import com.example.dsy1105_006d_lc7.ui.reposition.RepositionScreen
 import com.example.dsy1105_006d_lc7.ui.suppliers.SuppliersScreen
 
@@ -70,11 +73,36 @@ fun AppNav(
         }
 
         // ── Formulario de Producto (crear/editar) ──
-        composable("productForm") {
-            ProductFormScreen(
-                navController = navController,
-                role = currentRole
+        composable(
+            route = "productForm?productId={productId}",
+            arguments = listOf(
+                navArgument("productId") {
+                    type = NavType.LongType
+                    defaultValue = -1L
+                }
             )
+        ) { backStackEntry ->
+            if (currentRole == UserRole.ADMIN) {
+                val productId = backStackEntry.arguments?.getLong("productId") ?: -1L
+                val productsEntry = remember(backStackEntry) {
+                    runCatching { navController.getBackStackEntry("products") }
+                        .getOrElse { backStackEntry }
+                }
+                val productsVm: ProductsViewModel = viewModel(
+                    viewModelStoreOwner = productsEntry,
+                    factory = ProductsViewModel.Factory(TallerApp.instance.repository)
+                )
+                ProductFormScreen(
+                    navController = navController,
+                    role = currentRole,
+                    productId = productId,
+                    vm = productsVm
+                )
+            } else {
+                LaunchedEffect(Unit) {
+                    navController.popBackStack()
+                }
+            }
         }
 
         // ── Módulo de Movimientos ──

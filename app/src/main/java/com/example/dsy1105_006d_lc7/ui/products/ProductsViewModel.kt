@@ -13,6 +13,7 @@ import com.example.dsy1105_006d_lc7.data.local.entity.SupplierEntity
 import com.example.dsy1105_006d_lc7.data.repository.InventoryRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.math.BigDecimal
 
 /**
  * Estado de la UI para la pantalla de productos.
@@ -45,6 +46,7 @@ data class ProductFormState(
     val proveedorId: Long? = null,
     val ubicacionId: Long? = null,
     val isEditing: Boolean = false,
+    val isSaving: Boolean = false,
     val error: String? = null
 )
 
@@ -60,6 +62,8 @@ class ProductsViewModel(private val repository: InventoryRepository) : ViewModel
     var formState by mutableStateOf(ProductFormState())
         private set
 
+    private var allProducts: List<ProductWithDetails> = emptyList()
+
     init {
         loadProducts()
         loadCategories()
@@ -70,6 +74,7 @@ class ProductsViewModel(private val repository: InventoryRepository) : ViewModel
     private fun loadProducts() {
         viewModelScope.launch {
             repository.getAllProductsWithDetails().collect { products ->
+                allProducts = products
                 uiState = uiState.copy(
                     products = applyFilters(products),
                     isLoading = false
@@ -81,7 +86,13 @@ class ProductsViewModel(private val repository: InventoryRepository) : ViewModel
     private fun loadCategories() {
         viewModelScope.launch {
             repository.getAllCategories().collect { categories ->
-                uiState = uiState.copy(categories = categories)
+                val activeCategory = uiState.selectedCategory?.takeIf { it in categories }
+                val categoryWasCleared = uiState.selectedCategory != null && activeCategory == null
+                uiState = uiState.copy(
+                    categories = categories,
+                    selectedCategory = activeCategory,
+                    products = if (categoryWasCleared) applyFilters(allProducts, selectedCategory = null) else uiState.products
+                )
             }
         }
     }
@@ -102,13 +113,17 @@ class ProductsViewModel(private val repository: InventoryRepository) : ViewModel
         }
     }
 
-    private fun applyFilters(products: List<ProductWithDetails>): List<ProductWithDetails> {
+    private fun applyFilters(
+        products: List<ProductWithDetails>,
+        selectedCategory: String? = uiState.selectedCategory,
+        searchQuery: String = uiState.searchQuery
+    ): List<ProductWithDetails> {
         var filtered = products
-        if (!uiState.selectedCategory.isNullOrBlank()) {
-            filtered = filtered.filter { it.product.categoria == uiState.selectedCategory }
+        if (!selectedCategory.isNullOrBlank()) {
+            filtered = filtered.filter { it.product.categoria == selectedCategory }
         }
-        if (uiState.searchQuery.isNotBlank()) {
-            val query = uiState.searchQuery.lowercase()
+        if (searchQuery.isNotBlank()) {
+            val query = searchQuery.lowercase()
             filtered = filtered.filter {
                 it.product.nombre.lowercase().contains(query) ||
                         it.product.codigoInterno.lowercase().contains(query)
@@ -118,21 +133,17 @@ class ProductsViewModel(private val repository: InventoryRepository) : ViewModel
     }
 
     fun onSearchQueryChange(query: String) {
-        uiState = uiState.copy(searchQuery = query)
-        refreshFilters()
+        uiState = uiState.copy(
+            searchQuery = query,
+            products = applyFilters(allProducts, searchQuery = query)
+        )
     }
 
     fun onCategoryFilter(category: String?) {
-        uiState = uiState.copy(selectedCategory = category)
-        refreshFilters()
-    }
-
-    private fun refreshFilters() {
-        viewModelScope.launch {
-            repository.getAllProductsWithDetails().first().let { products ->
-                uiState = uiState.copy(products = applyFilters(products))
-            }
-        }
+        uiState = uiState.copy(
+            selectedCategory = category,
+            products = applyFilters(allProducts, selectedCategory = category)
+        )
     }
 
     fun clearMessage() {
@@ -154,13 +165,39 @@ class ProductsViewModel(private val repository: InventoryRepository) : ViewModel
             categoria = product.categoria,
             cantidadDisponible = product.cantidadDisponible.toString(),
             existenciaMinima = product.existenciaMinima.toString(),
-            precioCompra = product.precioCompra.toString(),
-            precioVenta = product.precioVenta.toString(),
-            estado = product.estado,
+            precioCompra = formatPriceForInput(product.precioCompra),
+            precioVenta = formatPriceForInput(product.precioVenta),
+            estado = product.estado.ifBlank { "activo" },
             proveedorId = product.proveedorId,
             ubicacionId = product.ubicacionId,
-            isEditing = true
+            isEditing = true,
+            isSaving = false,
+            error = null
         )
+    }
+
+    /**
+     * Garantiza que el formulario esté cargado con el producto correspondiente al [productId]
+     * cuando se navega directamente o tras recreación del proceso.
+     */
+    fun ensureFormLoaded(productId: Long) {
+        if (productId > 0L) {
+            if (formState.isEditing && formState.id == productId) return
+            viewModelScope.launch {
+                val product = repository.getProductById(productId)
+                if (product != null) {
+                    initFormForEdit(product)
+                } else {
+                    formState = ProductFormState(
+                        id = productId,
+                        isEditing = true,
+                        error = "No se encontró el producto seleccionado"
+                    )
+                }
+            }
+        } else if (formState.isEditing) {
+            initFormForCreate()
+        }
     }
 
     fun onFormFieldChange(field: String, value: String) {
@@ -179,41 +216,94 @@ class ProductsViewModel(private val repository: InventoryRepository) : ViewModel
     }
 
     fun onSupplierSelected(supplierId: Long?) {
-        formState = formState.copy(proveedorId = supplierId)
+        formState = formState.copy(proveedorId = supplierId, error = null)
     }
 
     fun onLocationSelected(locationId: Long?) {
-        formState = formState.copy(ubicacionId = locationId)
+        formState = formState.copy(ubicacionId = locationId, error = null)
+    }
+
+    fun onEstadoSelected(estado: String) {
+        formState = formState.copy(estado = estado, error = null)
     }
 
     fun saveProduct(onSuccess: () -> Unit) {
-        // Validaciones
-        if (formState.codigoInterno.isBlank()) {
+        if (formState.isSaving) return
+
+        val codigo = formState.codigoInterno.trim()
+        val nombre = formState.nombre.trim()
+        val categoria = formState.categoria.trim()
+
+        if (codigo.isBlank()) {
             formState = formState.copy(error = "El código interno es obligatorio")
             return
         }
-        if (formState.nombre.isBlank()) {
+        if (nombre.isBlank()) {
             formState = formState.copy(error = "El nombre es obligatorio")
             return
         }
-        if (formState.categoria.isBlank()) {
+        if (categoria.isBlank()) {
             formState = formState.copy(error = "La categoría es obligatoria")
             return
         }
 
+        val cantidad = formState.cantidadDisponible.trim().toIntOrNull()
+        if (cantidad == null || cantidad < 0) {
+            formState = formState.copy(error = "El stock actual debe ser un número entero mayor o igual a 0")
+            return
+        }
+
+        val existenciaMinima = formState.existenciaMinima.trim().toIntOrNull()
+        if (existenciaMinima == null || existenciaMinima < 0) {
+            formState = formState.copy(error = "El stock mínimo debe ser un número entero mayor o igual a 0")
+            return
+        }
+
+        val precioCompra = parseDecimalInput(formState.precioCompra)
+        if (precioCompra == null || precioCompra < 0.0) {
+            formState = formState.copy(error = "El precio de compra debe ser un número válido mayor o igual a 0")
+            return
+        }
+
+        val precioVenta = parseDecimalInput(formState.precioVenta)
+        if (precioVenta == null || precioVenta < 0.0) {
+            formState = formState.copy(error = "El precio de venta debe ser un número válido mayor o igual a 0")
+            return
+        }
+
+        if (formState.isEditing && formState.id <= 0L) {
+            formState = formState.copy(error = "No se pudo identificar el producto a actualizar")
+            return
+        }
+
+        val estadoNormalizado = formState.estado.trim().lowercase().takeIf {
+            it == "activo" || it == "descontinuado"
+        } ?: "activo"
+
+        formState = formState.copy(isSaving = true, error = null)
+
         viewModelScope.launch {
             try {
+                val existingWithCode = repository.getProductByCode(codigo)
+                if (existingWithCode != null && (!formState.isEditing || existingWithCode.id != formState.id)) {
+                    formState = formState.copy(
+                        isSaving = false,
+                        error = "Ya existe un producto con el código interno '$codigo'"
+                    )
+                    return@launch
+                }
+
                 val product = ProductEntity(
                     id = if (formState.isEditing) formState.id else 0,
-                    codigoInterno = formState.codigoInterno.trim(),
-                    nombre = formState.nombre.trim(),
+                    codigoInterno = codigo,
+                    nombre = nombre,
                     descripcion = formState.descripcion.trim(),
-                    categoria = formState.categoria.trim(),
-                    cantidadDisponible = formState.cantidadDisponible.toIntOrNull() ?: 0,
-                    existenciaMinima = formState.existenciaMinima.toIntOrNull() ?: 1,
-                    precioCompra = formState.precioCompra.toDoubleOrNull() ?: 0.0,
-                    precioVenta = formState.precioVenta.toDoubleOrNull() ?: 0.0,
-                    estado = formState.estado,
+                    categoria = categoria,
+                    cantidadDisponible = cantidad,
+                    existenciaMinima = existenciaMinima,
+                    precioCompra = precioCompra,
+                    precioVenta = precioVenta,
+                    estado = estadoNormalizado,
                     proveedorId = formState.proveedorId,
                     ubicacionId = formState.ubicacionId
                 )
@@ -225,9 +315,13 @@ class ProductsViewModel(private val repository: InventoryRepository) : ViewModel
                     repository.insertProduct(product)
                     uiState = uiState.copy(message = "Producto creado correctamente")
                 }
+                formState = formState.copy(isSaving = false)
                 onSuccess()
             } catch (e: Exception) {
-                formState = formState.copy(error = "Error al guardar: ${e.message}")
+                formState = formState.copy(
+                    isSaving = false,
+                    error = "Error al guardar: ${e.message}"
+                )
             }
         }
     }
@@ -247,6 +341,10 @@ class ProductsViewModel(private val repository: InventoryRepository) : ViewModel
      * Permite al Administrador modificar la existencia mínima directamente.
      */
     fun updateMinStock(product: ProductEntity, newMinStock: Int) {
+        if (newMinStock < 0) {
+            uiState = uiState.copy(message = "La existencia mínima no puede ser negativa")
+            return
+        }
         viewModelScope.launch {
             try {
                 val updated = product.copy(existenciaMinima = newMinStock)
@@ -255,6 +353,21 @@ class ProductsViewModel(private val repository: InventoryRepository) : ViewModel
             } catch (e: Exception) {
                 uiState = uiState.copy(message = "Error al actualizar stock mínimo: ${e.message}")
             }
+        }
+    }
+
+    private fun parseDecimalInput(raw: String): Double? {
+        val normalized = raw.trim().replace(',', '.')
+        val value = normalized.toDoubleOrNull() ?: return null
+        return if (value.isFinite()) value else null
+    }
+
+    private fun formatPriceForInput(price: Double): String {
+        return when {
+            price == 0.0 -> "0"
+            price % 1.0 == 0.0 && price >= Long.MIN_VALUE && price <= Long.MAX_VALUE ->
+                price.toLong().toString()
+            else -> BigDecimal.valueOf(price).stripTrailingZeros().toPlainString()
         }
     }
 

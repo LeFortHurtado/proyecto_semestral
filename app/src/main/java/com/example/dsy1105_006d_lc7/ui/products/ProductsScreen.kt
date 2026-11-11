@@ -133,7 +133,7 @@ fun ProductsScreen(
                         } else null
                     )
                 }
-                items(state.categories) { category ->
+                items(state.categories, key = { it }) { category ->
                     FilterChip(
                         selected = state.selectedCategory == category,
                         onClick = { vm.onCategoryFilter(category) },
@@ -180,14 +180,14 @@ fun ProductsScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(state.products) { productWithDetails ->
+                    items(state.products, key = { it.product.id }) { productWithDetails ->
                         ProductItem(
                             productWithDetails = productWithDetails,
                             role = role,
                             onOpenDetail = { selectedProductForDetail = productWithDetails },
                             onEdit = {
                                 vm.initFormForEdit(productWithDetails.product)
-                                navController.navigate("productForm")
+                                navController.navigate("productForm?productId=${productWithDetails.product.id}")
                             },
                             onDelete = {
                                 showDeleteDialog = productWithDetails
@@ -205,6 +205,12 @@ fun ProductsScreen(
                 productWithDetails = prodWithDetails,
                 role = role,
                 onDismiss = { selectedProductForDetail = null },
+                onEdit = {
+                    val toEdit = prodWithDetails.product
+                    selectedProductForDetail = null
+                    vm.initFormForEdit(toEdit)
+                    navController.navigate("productForm?productId=${toEdit.id}")
+                },
                 onUpdateMinStock = { newMinStock ->
                     vm.updateMinStock(prodWithDetails.product, newMinStock)
                     selectedProductForDetail = null
@@ -355,6 +361,16 @@ fun ProductItem(
                 )
             }
 
+            if (product.estado != "activo") {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Estado: Descontinuado",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
             if (product.cantidadDisponible <= product.existenciaMinima) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -419,6 +435,7 @@ fun ProductDetailDialog(
     productWithDetails: ProductWithDetails,
     role: UserRole,
     onDismiss: () -> Unit,
+    onEdit: () -> Unit,
     onUpdateMinStock: (Int) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -426,8 +443,11 @@ fun ProductDetailDialog(
     val location = productWithDetails.location
     val supplier = productWithDetails.supplier
 
-    var minStockInput by remember(product.existenciaMinima) {
+    var minStockInput by remember(product.id, product.existenciaMinima) {
         mutableStateOf(product.existenciaMinima.toString())
+    }
+    var minStockError by remember(product.id, product.existenciaMinima) {
+        mutableStateOf(false)
     }
 
     val stockBadgeColor = when {
@@ -487,6 +507,11 @@ fun ProductDetailDialog(
                 }
 
                 DetailRow(Icons.Default.Category, "Categoría", product.categoria)
+                DetailRow(
+                    Icons.Default.Info,
+                    "Estado",
+                    if (product.estado == "descontinuado") "Descontinuado" else "Activo"
+                )
 
                 // ── Ubicación de bodega (zona, estante, repisa) - Visible para SELLER ──
                 val ubicacionTexto = location?.let {
@@ -580,8 +605,12 @@ fun ProductDetailDialog(
                         ) {
                             OutlinedTextField(
                                 value = minStockInput,
-                                onValueChange = { minStockInput = it },
+                                onValueChange = {
+                                    minStockInput = it
+                                    minStockError = false
+                                },
                                 label = { Text("Mínimo") },
+                                isError = minStockError,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
                                 modifier = Modifier.weight(1f),
@@ -589,15 +618,24 @@ fun ProductDetailDialog(
                             )
                             Button(
                                 onClick = {
-                                    val newMin = minStockInput.toIntOrNull()
+                                    val newMin = minStockInput.trim().toIntOrNull()
                                     if (newMin != null && newMin >= 0) {
                                         onUpdateMinStock(newMin)
+                                    } else {
+                                        minStockError = true
                                     }
                                 },
                                 shape = RoundedCornerShape(10.dp)
                             ) {
                                 Text("Guardar")
                             }
+                        }
+                        if (minStockError) {
+                            Text(
+                                text = "Ingresa un número entero mayor o igual a 0",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
                     }
                 } else {
@@ -609,9 +647,18 @@ fun ProductDetailDialog(
                     )
                 }
 
-                // CONDICIONAL 3: Botón o acción de Eliminar producto (Oculto al SELLER, solo ADMIN)
+                // CONDICIONAL 3: Botones de Editar y Eliminar producto (Ocultos al SELLER, solo ADMIN)
                 if (role == UserRole.ADMIN) {
                     Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = onEdit,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Editar Producto")
+                    }
                     OutlinedButton(
                         onClick = onDelete,
                         colors = ButtonDefaults.outlinedButtonColors(
