@@ -62,11 +62,11 @@ El sistema implementa **control de acceso basado en roles (RBAC)** con dos perfi
 - Diálogo de confirmación para eliminación segura.
 - Vista de detalle expandible por producto.
 
-### Módulo de Movimientos de Stock
-- Registro de ingresos, ventas y consumos internos.
-- Actualización automática del stock al confirmar un movimiento.
-- Selección de producto mediante lectura de código QR con la cámara del dispositivo (CameraX + ML Kit).
-- Historial de movimientos con información del producto asociado.
+### Módulo de Movimientos de Stock (CRUD Completo)
+- **Creación (Create):** Registro de ingresos, ventas, consumos internos, ajustes y devoluciones con selección manual o lectura de código QR con la cámara del dispositivo (CameraX + Google ML Kit).
+- **Consulta y Detalle (Read):** Historial reactivo ordenado cronológicamente, filtros por tipo y diálogo modal de detalle exhaustivo (producto asociado, existencias anterior y resultante, fecha/hora y motivo).
+- **Edición (Update):** Modificación de movimientos existentes con recálculo atómico y transaccional del stock disponible, preservando la coherencia del inventario.
+- **Eliminación (Delete):** Borrado seguro de movimientos con diálogo de confirmación y reversión automática del impacto en el stock del producto en bodega.
 
 ### Módulo de Reposición (Solo Admin)
 - Detección automática de productos con stock por debajo de la existencia mínima.

@@ -24,9 +24,12 @@ data class MovementsUiState(
 )
 
 /**
- * Estado del formulario para registrar un movimiento.
+ * Estado del formulario para registrar o editar un movimiento.
  */
 data class MovementFormState(
+    val id: Long = 0,
+    val isEditing: Boolean = false,
+    val isSaving: Boolean = false,
     val selectedProduct: ProductEntity? = null,
     val selectedProductId: Long? = null,
     val selectedProductName: String = "",
@@ -100,10 +103,56 @@ class MovementsViewModel(private val repository: InventoryRepository) : ViewMode
         formState = formState.copy(scanSuccessMessage = null)
     }
 
-    // ── Formulario ──
+    // ── Formulario y Operaciones CRUD ──
+
+    fun initFormForCreate() {
+        formState = MovementFormState()
+    }
 
     fun initForm() {
-        formState = MovementFormState()
+        initFormForCreate()
+    }
+
+    fun initFormForEdit(movementWithProduct: MovementWithProduct) {
+        val mov = movementWithProduct.movement
+        val prod = movementWithProduct.product
+        formState = MovementFormState(
+            id = mov.id,
+            isEditing = true,
+            isSaving = false,
+            selectedProduct = prod,
+            selectedProductId = prod.id,
+            selectedProductName = "${prod.codigoInterno} - ${prod.nombre}",
+            tipo = mov.tipo,
+            cantidad = mov.cantidad.toString(),
+            motivo = mov.motivo,
+            stockActual = prod.cantidadDisponible,
+            error = null
+        )
+    }
+
+    /**
+     * Garantiza que el formulario cargue el movimiento especificado al navegar
+     * directamente o restaurar el estado.
+     */
+    fun ensureFormLoaded(movementId: Long) {
+        if (movementId > 0L) {
+            if (formState.isEditing && formState.id == movementId) return
+            viewModelScope.launch {
+                val movWithProduct = repository.getMovementWithProductById(movementId)
+                if (movWithProduct != null) {
+                    initFormForEdit(movWithProduct)
+                } else {
+                    formState = MovementFormState(
+                        id = movementId,
+                        isEditing = true,
+                        error = "No se encontró el movimiento seleccionado"
+                    )
+                }
+            }
+        } else if (formState.isEditing) {
+            initFormForCreate()
+        }
     }
 
     fun onProductSelected(product: ProductEntity) {
@@ -185,7 +234,12 @@ class MovementsViewModel(private val repository: InventoryRepository) : ViewMode
         formState = formState.copy(motivo = motivo, error = null)
     }
 
-    fun registerMovement(onSuccess: () -> Unit) {
+    /**
+     * Guarda el movimiento (creación o actualización según formState.isEditing).
+     */
+    fun saveMovement(onSuccess: () -> Unit) {
+        if (formState.isSaving) return
+
         // 1. Validar selección de producto
         if (formState.selectedProductId == null) {
             formState = formState.copy(error = "Debe seleccionar un producto del inventario")
@@ -199,10 +253,9 @@ class MovementsViewModel(private val repository: InventoryRepository) : ViewMode
             return
         }
 
-        // 3. Validación Crítica: Regla de negocio que impide registrar Venta o Consumo
-        // si la cantidad solicitada supera las existencias actuales disponibles (evitar stock negativo)
+        // 3. Validación de existencias si es creación de Venta o Consumo
         val tipoNormalizado = formState.tipo.lowercase().trim()
-        if (tipoNormalizado == "venta" || tipoNormalizado == "consumo") {
+        if (!formState.isEditing && (tipoNormalizado == "venta" || tipoNormalizado == "consumo")) {
             if (qty > formState.stockActual) {
                 val operacion = if (tipoNormalizado == "venta") "Venta" else "Consumo en servicio"
                 formState = formState.copy(
@@ -212,21 +265,70 @@ class MovementsViewModel(private val repository: InventoryRepository) : ViewMode
             }
         }
 
-        viewModelScope.launch {
-            val result = repository.registerMovement(
-                tipo = formState.tipo,
-                productId = formState.selectedProductId!!,
-                cantidad = qty,
-                motivo = formState.motivo.trim()
-            )
+        formState = formState.copy(isSaving = true)
 
+        viewModelScope.launch {
+            if (formState.isEditing) {
+                val result = repository.updateMovement(
+                    movementId = formState.id,
+                    newTipo = formState.tipo,
+                    newProductId = formState.selectedProductId!!,
+                    newCantidad = qty,
+                    newMotivo = formState.motivo.trim()
+                )
+
+                result.fold(
+                    onSuccess = {
+                        formState = formState.copy(isSaving = false)
+                        uiState = uiState.copy(message = "Movimiento actualizado correctamente")
+                        onSuccess()
+                    },
+                    onFailure = { error ->
+                        formState = formState.copy(
+                            isSaving = false,
+                            error = error.message ?: "Error al actualizar el movimiento"
+                        )
+                    }
+                )
+            } else {
+                val result = repository.registerMovement(
+                    tipo = formState.tipo,
+                    productId = formState.selectedProductId!!,
+                    cantidad = qty,
+                    motivo = formState.motivo.trim()
+                )
+
+                result.fold(
+                    onSuccess = {
+                        formState = formState.copy(isSaving = false)
+                        uiState = uiState.copy(message = "Movimiento registrado correctamente")
+                        onSuccess()
+                    },
+                    onFailure = { error ->
+                        formState = formState.copy(
+                            isSaving = false,
+                            error = error.message ?: "Error al registrar el movimiento"
+                        )
+                    }
+                )
+            }
+        }
+    }
+
+    fun registerMovement(onSuccess: () -> Unit) = saveMovement(onSuccess)
+
+    /**
+     * Elimina un movimiento de inventario revirtiendo su impacto en el stock.
+     */
+    fun deleteMovement(movement: com.example.dsy1105_006d_lc7.data.local.entity.MovementEntity) {
+        viewModelScope.launch {
+            val result = repository.deleteMovement(movement)
             result.fold(
                 onSuccess = {
-                    uiState = uiState.copy(message = "Movimiento registrado correctamente")
-                    onSuccess()
+                    uiState = uiState.copy(message = "Movimiento eliminado y existencias revertidas")
                 },
                 onFailure = { error ->
-                    formState = formState.copy(error = error.message ?: "Error al registrar el movimiento")
+                    uiState = uiState.copy(message = error.message ?: "Error al eliminar el movimiento")
                 }
             )
         }

@@ -26,7 +26,7 @@ import com.example.dsy1105_006d_lc7.ui.qr.CameraPermissionHelper
 import com.example.dsy1105_006d_lc7.ui.qr.QrScannerDialog
 
 /**
- * Pantalla de formulario para registrar un nuevo movimiento de inventario.
+ * Pantalla de formulario para registrar o editar un movimiento de inventario.
  * Incorpora filtrado condicional de opciones por rol (SELLER solo Ingreso, Venta y Consumo en servicio).
  * Permite seleccionar el producto mediante lista desplegable o escaneo de código QR (cámara).
  */
@@ -35,10 +35,15 @@ import com.example.dsy1105_006d_lc7.ui.qr.QrScannerDialog
 fun MovementFormScreen(
     navController: NavController,
     role: UserRole = UserRole.ADMIN,
+    movementId: Long = -1L,
     vm: MovementsViewModel = viewModel(
         factory = MovementsViewModel.Factory(TallerApp.instance.repository)
     )
 ) {
+    LaunchedEffect(movementId) {
+        vm.ensureFormLoaded(movementId)
+    }
+
     val context = LocalContext.current
     val form = vm.formState
     val state = vm.uiState
@@ -128,7 +133,12 @@ fun MovementFormScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Registrar Movimiento", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        if (form.isEditing) "Editar Movimiento" else "Registrar Movimiento",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
@@ -177,13 +187,14 @@ fun MovementFormScreen(
             item {
                 ExposedDropdownMenuBox(
                     expanded = typeExpanded,
-                    onExpandedChange = { typeExpanded = !typeExpanded }
+                    onExpandedChange = { if (!form.isSaving) typeExpanded = !typeExpanded }
                 ) {
                     val currentTypeLabel = allowedMovementTypes.find { it.first == form.tipo }?.second ?: "Seleccionar tipo"
                     OutlinedTextField(
                         value = currentTypeLabel,
                         onValueChange = {},
                         readOnly = true,
+                        enabled = !form.isSaving,
                         label = { Text("Tipo de Movimiento *") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
                         modifier = Modifier
@@ -252,12 +263,13 @@ fun MovementFormScreen(
                     Box(modifier = Modifier.weight(1f)) {
                         ExposedDropdownMenuBox(
                             expanded = productExpanded,
-                            onExpandedChange = { productExpanded = !productExpanded }
+                            onExpandedChange = { if (!form.isSaving) productExpanded = !productExpanded }
                         ) {
                             OutlinedTextField(
                                 value = form.selectedProductName.ifBlank { "Seleccionar producto..." },
                                 onValueChange = {},
                                 readOnly = true,
+                                enabled = !form.isSaving,
                                 label = { Text("Producto (Lista o QR) *") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = productExpanded) },
                                 modifier = Modifier
@@ -303,6 +315,7 @@ fun MovementFormScreen(
                                 permissionLauncher.launch(Manifest.permission.CAMERA)
                             }
                         },
+                        enabled = !form.isSaving,
                         modifier = Modifier.size(56.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
@@ -327,6 +340,7 @@ fun MovementFormScreen(
                             permissionLauncher.launch(Manifest.permission.CAMERA)
                         }
                     },
+                    enabled = !form.isSaving,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
@@ -454,6 +468,7 @@ fun MovementFormScreen(
                     placeholder = { Text("Ej: 5") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
+                    enabled = !form.isSaving,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -467,16 +482,18 @@ fun MovementFormScreen(
                     label = { Text("Motivo / Observación") },
                     placeholder = { Text("Descripción u orden de trabajo") },
                     maxLines = 3,
+                    enabled = !form.isSaving,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
             }
 
-            // ── Botón registrar ──
+            // ── Botón registrar / actualizar ──
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = { vm.registerMovement { navController.popBackStack() } },
+                    onClick = { vm.saveMovement { navController.popBackStack() } },
+                    enabled = !form.isSaving,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
@@ -485,10 +502,18 @@ fun MovementFormScreen(
                         containerColor = MaterialTheme.colorScheme.tertiary
                     )
                 ) {
-                    Icon(Icons.Default.Save, contentDescription = null)
+                    if (form.isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onTertiary
+                        )
+                    } else {
+                        Icon(Icons.Default.Save, contentDescription = null)
+                    }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        "Registrar Movimiento",
+                        if (form.isEditing) "Actualizar Movimiento" else "Registrar Movimiento",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )

@@ -19,6 +19,7 @@ import com.example.dsy1105_006d_lc7.ui.login.AuthViewModel
 import com.example.dsy1105_006d_lc7.ui.login.HomeScreen
 import com.example.dsy1105_006d_lc7.ui.movements.MovementFormScreen
 import com.example.dsy1105_006d_lc7.ui.movements.MovementsScreen
+import com.example.dsy1105_006d_lc7.ui.movements.MovementsViewModel
 import com.example.dsy1105_006d_lc7.ui.products.ProductFormScreen
 import com.example.dsy1105_006d_lc7.ui.products.ProductsScreen
 import com.example.dsy1105_006d_lc7.ui.products.ProductsViewModel
@@ -106,18 +107,42 @@ fun AppNav(
         }
 
         // ── Módulo de Movimientos ──
-        composable("movements") {
+        composable("movements") { backStackEntry ->
+            val movementsVm: MovementsViewModel = viewModel(
+                viewModelStoreOwner = backStackEntry,
+                factory = MovementsViewModel.Factory(TallerApp.instance.repository)
+            )
             MovementsScreen(
                 navController = navController,
-                role = currentRole
+                role = currentRole,
+                vm = movementsVm
             )
         }
 
-        // ── Formulario de Movimiento ──
-        composable("movementForm") {
+        // ── Formulario de Movimiento (crear/editar) ──
+        composable(
+            route = "movementForm?movementId={movementId}",
+            arguments = listOf(
+                navArgument("movementId") {
+                    type = NavType.LongType
+                    defaultValue = -1L
+                }
+            )
+        ) { backStackEntry ->
+            val movementId = backStackEntry.arguments?.getLong("movementId") ?: -1L
+            val movementsEntry = remember(backStackEntry) {
+                runCatching { navController.getBackStackEntry("movements") }
+                    .getOrElse { backStackEntry }
+            }
+            val movementsVm: MovementsViewModel = viewModel(
+                viewModelStoreOwner = movementsEntry,
+                factory = MovementsViewModel.Factory(TallerApp.instance.repository)
+            )
             MovementFormScreen(
                 navController = navController,
-                role = currentRole
+                role = currentRole,
+                movementId = movementId,
+                vm = movementsVm
             )
         }
 

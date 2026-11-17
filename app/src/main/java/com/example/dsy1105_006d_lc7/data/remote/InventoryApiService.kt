@@ -36,8 +36,17 @@ interface InventoryApiService {
     @GET("api/movimientos")
     suspend fun getAllMovements(): Response<List<MovementEntity>>
 
+    @GET("api/movimientos/{id}")
+    suspend fun getMovementById(@Path("id") id: Long): Response<MovementEntity>
+
     @POST("api/movimientos")
     suspend fun createMovement(@Body movement: MovementEntity): Response<MovementEntity>
+
+    @PUT("api/movimientos/{id}")
+    suspend fun updateMovement(@Path("id") id: Long, @Body movement: MovementEntity): Response<MovementEntity>
+
+    @DELETE("api/movimientos/{id}")
+    suspend fun deleteMovement(@Path("id") id: Long): Response<Unit>
 
     // ── Proveedores ──
 

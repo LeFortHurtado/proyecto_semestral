@@ -16,6 +16,15 @@ interface MovementDao {
     @Insert
     suspend fun insert(movement: MovementEntity): Long
 
+    @Update
+    suspend fun update(movement: MovementEntity)
+
+    @Delete
+    suspend fun delete(movement: MovementEntity)
+
+    @Query("SELECT * FROM movements WHERE id = :id")
+    suspend fun getMovementById(id: Long): MovementEntity?
+
     @Query("SELECT * FROM movements ORDER BY fechaHora DESC")
     fun getAllMovements(): Flow<List<MovementEntity>>
 
@@ -29,6 +38,10 @@ interface MovementDao {
     fun getMovementsByDateRange(startDate: Long, endDate: Long): Flow<List<MovementEntity>>
 
     // ── Consultas con relaciones ──
+
+    @Transaction
+    @Query("SELECT * FROM movements WHERE id = :id")
+    suspend fun getMovementWithProductById(id: Long): MovementWithProduct?
 
     @Transaction
     @Query("SELECT * FROM movements ORDER BY fechaHora DESC")
