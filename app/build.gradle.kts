@@ -65,11 +65,6 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
-    // Retrofit (API REST)
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.converter.gson)
-    implementation(libs.gson)
-
     // CameraX (Lector de códigos QR)
     val cameraxVersion = "1.4.1"
     implementation("androidx.camera:camera-core:$cameraxVersion")

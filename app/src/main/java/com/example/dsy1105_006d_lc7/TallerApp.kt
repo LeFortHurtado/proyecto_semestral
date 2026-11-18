@@ -1,17 +1,14 @@
 package com.example.dsy1105_006d_lc7
 
 import android.app.Application
-import com.example.dsy1105_006d_lc7.data.local.AppDatabase
-import com.example.dsy1105_006d_lc7.data.repository.InventoryRepository
+import com.example.dsy1105_006d_lc7.model.data.local.BaseDeDatos
 
 /**
- * Clase Application personalizada que inicializa la base de datos
- * y el repositorio como singletons accesibles en toda la app.
+ * Clase Application que inicializa la base de datos Room singleton.
  */
 class TallerApp : Application() {
 
-    val database: AppDatabase by lazy { AppDatabase.getDatabase(this) }
-    val repository: InventoryRepository by lazy { InventoryRepository(database) }
+    val database: BaseDeDatos by lazy { BaseDeDatos.getDatabase(this) }
 
     companion object {
         lateinit var instance: TallerApp
