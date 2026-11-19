@@ -12,6 +12,9 @@ interface ProveedorDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(supplier: ProveedorEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(suppliers: List<ProveedorEntity>)
+
     @Update
     suspend fun update(supplier: ProveedorEntity)
 

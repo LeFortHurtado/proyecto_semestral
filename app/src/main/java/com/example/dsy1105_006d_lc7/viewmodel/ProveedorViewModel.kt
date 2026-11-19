@@ -10,6 +10,7 @@ import com.example.dsy1105_006d_lc7.model.ProveedorFormState
 import com.example.dsy1105_006d_lc7.model.ProveedoresUiState
 import com.example.dsy1105_006d_lc7.model.data.local.BaseDeDatos
 import com.example.dsy1105_006d_lc7.model.data.local.ProveedorEntity
+import com.example.dsy1105_006d_lc7.model.data.remote.RetrofitClient
 import kotlinx.coroutines.launch
 
 /**
@@ -31,6 +32,8 @@ class ProveedorViewModel(app: Application) : AndroidViewModel(app) {
                 uiState = uiState.copy(suppliers = suppliers, isLoading = false)
             }
         }
+
+        refreshSuppliersFromApi()
     }
 
     fun clearMessage() {
@@ -102,6 +105,23 @@ class ProveedorViewModel(app: Application) : AndroidViewModel(app) {
                 uiState = uiState.copy(message = "Proveedor eliminado")
             } catch (e: Exception) {
                 uiState = uiState.copy(message = "Error: ${e.message}")
+            }
+        }
+    }
+
+    fun  refreshSuppliersFromApi(){
+        viewModelScope.launch {
+            try {
+
+                val remoteSuppliers = RetrofitClient.instance.getProveedores()
+
+                dao.insertAll(remoteSuppliers)
+
+                uiState = uiState.copy(message = null)
+            } catch (e: Exception){
+                e.printStackTrace()
+                println("ERROR DE RETROFIT: ${e.message}")
+                uiState = uiState.copy(message = "Modo offline: No se pudo conectar al servidor")
             }
         }
     }
